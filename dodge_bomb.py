@@ -3,6 +3,7 @@ import sys
 import pygame as pg
 import random
 import time
+import math  # 追従計算のために追加
 
 WIDTH, HEIGHT = 1100, 650
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -52,6 +53,25 @@ def get_kk_imgs() -> dict[tuple[int, int], pg.Surface]:
     }
     return kk_dict
 
+def calc_orientation(org: pg.Rect, dst: pg.Rect, current_xy: tuple[float, float]) -> tuple[float, float]:
+    """
+    orgからdstへの方向ベクトルを計算し、指定のノルムに正規化して返す
+    ただし、距離が500未満の場合は慣性（current_xy）を維持する
+    """
+    diff_x = dst.centerx - org.centerx
+    diff_y = dst.centery - org.centery
+    dist = math.sqrt(diff_x**2 + diff_y**2)
+    
+    # 距離が500未満なら追従せず今の向き（慣性）を維持
+    if dist < 500:
+        return current_xy
+        
+    # ノルムが √50 になるように正規化
+    norm = math.sqrt(50)
+    vx = diff_x / dist * norm
+    vy = diff_y / dist * norm
+    return vx, vy
+
 def gameover(screen: pg.Surface) -> None:
     """
     ゲームオーバー画面を表示する
@@ -89,7 +109,7 @@ def main():
 
     # 爆弾初期設定
     bb_imgs, bb_accs = init_bb_imgs()
-    vx, vy = +5, +5
+    vx, vy = +5, +5  # floatでの計算に対応
     bb_img = bb_imgs[0]
     bb_rct = bb_img.get_rect()
     bb_rct.center = random.randint(0, WIDTH), random.randint(0, HEIGHT)
@@ -102,12 +122,12 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT: return
         
-        # 爆弾のパラメータ更新
+        # 爆弾の追従とパラメータ更新
+        vx, vy = calc_orientation(bb_rct, kk_rct, (vx, vy))
         idx = min(tmr // 500, 9)
-        avx = vx * bb_accs[idx]
-        avy = vy * bb_accs[idx]
+        avx, avy = vx * bb_accs[idx], vy * bb_accs[idx]
+        
         bb_img = bb_imgs[idx]
-        # Rectのサイズ更新（当たり判定の拡大）
         bb_rct.width = bb_img.get_rect().width
         bb_rct.height = bb_img.get_rect().height
         
@@ -126,7 +146,6 @@ def main():
                 sum_mv[0] += mv[0]
                 sum_mv[1] += mv[1]
         
-        # 移動量に合わせて画像を切り替え
         if tuple(sum_mv) in kk_imgs:
             kk_img = kk_imgs[tuple(sum_mv)]
             

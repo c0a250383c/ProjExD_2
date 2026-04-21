@@ -136,6 +136,7 @@ def main():
             gameover(screen)
             return 
 
+
         screen.blit(bg_img, [0, 0]) 
         
         # こうかとん移動処理
